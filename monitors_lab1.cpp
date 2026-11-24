@@ -15,7 +15,7 @@ struct EventData {
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condition = PTHREAD_COND_INITIALIZER;
 bool stopping = false;
-int ready = 0;
+bool ready = false;
 EventData* shared_data = nullptr;
 
 void* producer(void* arg) {
@@ -27,13 +27,13 @@ void* producer(void* arg) {
             pthread_mutex_unlock(&mutex);
             break;
         }
-        if (ready == 1) {
+        if (ready == true) {
             pthread_mutex_unlock(&mutex);
             continue;
         }
         counter++;
         shared_data = new EventData(counter, "Данные события");
-        ready = 1;
+        ready = true;
         cout << "[Поставщик] Событие " << counter << " отправлено" << endl;
         pthread_cond_signal(&condition);
         pthread_mutex_unlock(&mutex);
@@ -45,7 +45,7 @@ void* consumer(void* arg) {
     pthread_mutex_lock(&mutex);
 
     while (true) {
-        while (ready == 0) {
+        while (ready == false) {
             if (stopping) {
                 pthread_mutex_unlock(&mutex);
                 return nullptr;
@@ -56,14 +56,11 @@ void* consumer(void* arg) {
 
         EventData* ev = shared_data;
         shared_data = nullptr;
-        ready = 0;
+        ready = false;
 
         cout << "[Потребитель] Событие" << ev->id << " получено. Payload: " << ev->payload << endl;
 
         delete ev;
-
-        pthread_mutex_unlock(&mutex);
-        pthread_mutex_lock(&mutex);
     }
 
     return nullptr;
@@ -89,12 +86,11 @@ int main() {
     if (shared_data != nullptr) {
         delete shared_data;
         shared_data = nullptr;
-        ready = 0;
+        ready = false;
     }
     pthread_mutex_unlock(&mutex);
 
     pthread_mutex_destroy(&mutex);
     pthread_cond_destroy(&condition);
-    cout << "Монитор завершён" << endl;
     return 0;
 }
